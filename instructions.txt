@@ -1,0 +1,2 @@
+How to generate jar to upload.
+		mvn assembly:assembly -DdescriptorId=jar-with-dependencies package
