@@ -211,7 +211,7 @@ public class StockAlertSpeechlet implements Speechlet{
     		}
     	}
     	return String.format("Your stock is %s. And today it %s from last day by %4.2f percentage "
-    			+ "and the amount %s is %4.2f", 
+    			+ "and the amount %s is %4.2f dollar", 
     			stock, gainLossEqual, percentage, gainLossEqual, Math.abs(value.getOpen()-value.getClose()));
     }
     
