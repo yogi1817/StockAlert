@@ -8,7 +8,13 @@ import java.io.Reader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
@@ -38,7 +44,7 @@ public class StockAlertSpeechlet implements Speechlet{
 	
 	private static final String STOCK_KEY = "STOCKKEY";
 	
-	private static String url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&interval=1min&symbol=STOCK_NAME&apikey=W7WQEJ0I6WQ1MMJ2";
+	private static String url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=CTSH&apikey=W7WQEJ0I6WQ1MMJ2";
 	@Override
 	public void onSessionStarted(SessionStartedRequest request, Session session) throws SpeechletException {
 		log.debug("onSessionStarted requestId={}, sessionId={}", request.getRequestId(),
@@ -81,14 +87,14 @@ public class StockAlertSpeechlet implements Speechlet{
 		// Get the slots from the intent.
         Map<String, Slot> slots = intent.getSlots();
 
-        // Get the color slot from the list of slots.
+        // Get the stock slot from the list of slots.
         Slot favoriteStockSlot = slots.get(STOCK_SLOT);
         String speechText, repromptText;
 
-        // Check for favorite color and create output to user.
+        // Check for favorite stock and create output to user.
         if (favoriteStockSlot != null) {
         	log.debug("favoriteStockSlot.getValue() "+ favoriteStockSlot.getValue());
-            // Store the user's favorite color in the Session and create response.
+            // Store the user's favorite stock in the Session and create response.
             String favoriteStock = favoriteStockSlot.getValue();
             session.setAttribute(STOCK_KEY, favoriteStock);
             speechText =
@@ -99,11 +105,11 @@ public class StockAlertSpeechlet implements Speechlet{
 
         } else {
         	log.debug("invalid stock name");
-            // Render an error since we don't know what the users favorite color is.
+            // Render an error since we don't know what the users favorite stock is.
             speechText = "I'm not sure what your favorite stock is, please try again";
             repromptText =
                     "I'm not sure what your favorite stock is. You can tell me your favorite "
-                            + "color by saying, my favorite stock is ctsh pr acn";
+                            + "stock by saying, my favorite stock is ctsh pr acn";
         }
 
         return getSpeechletResponse(speechText, repromptText, true);
@@ -166,11 +172,11 @@ public class StockAlertSpeechlet implements Speechlet{
     	String speechText;
         boolean isAskResponse = false;
 
-        // Get the user's favorite color from the session.
+        // Get the user's favorite stock from the session.
         String favoriteStock = (String) session.getAttribute(STOCK_KEY);
 
         Value value = null;
-        // Check to make sure user's favorite color is set in the session.
+        // Check to make sure user's favorite stock is set in the session.
         if (StringUtils.isNotEmpty(favoriteStock)) {
         	log.debug("favoriteStock from  getStockValueFromService"+ favoriteStock);
         	try {
@@ -183,9 +189,9 @@ public class StockAlertSpeechlet implements Speechlet{
 			}
             speechText = getSpeechText(value, favoriteStock);
         } else {
-            // Since the user's favorite color is not set render an error message.
+            // Since the user's favorite stock is not set render an error message.
             speechText =
-                    "I'm not sure what your favorite stock is. You can say, my favorite color is ctsh or acn";
+                    "I'm not sure what your favorite stock is. You can say, my favorite stock is ctsh or acn";
             isAskResponse = true;
         }
 
@@ -208,8 +214,9 @@ public class StockAlertSpeechlet implements Speechlet{
     			gainLossEqual = new String("remians Equal");
     		}
     	}
-    	return String.format("Your favorite stock is %s. And today it %s from last day by %4.3f percentage", 
-    			favoriteStock, gainLossEqual, percentage);
+    	return String.format("Your favorite stock is %s. And today it %s from last day by %4.2f percentage "
+    			+ "and the amount %s is %4.2f", 
+    			favoriteStock, gainLossEqual, percentage, gainLossEqual, Math.abs(value.getOpen()-value.getClose()));
     }
     
     public Value getStockValue(String stockName) throws MalformedURLException, IOException{
@@ -220,17 +227,8 @@ public class StockAlertSpeechlet implements Speechlet{
           
           JSONObject jObject  = new JSONObject(jsonText);
           JSONObject timeSeriesDaily  = jObject.getJSONObject("Time Series (Daily)");
-          JSONObject menu = timeSeriesDaily.getJSONObject("2017-10-20");
-          
-          Value value = new Value();
-          
-          value.setOpen(menu.getDouble("1. open"));
-          value.setHigh(menu.getDouble("2. high"));
-          value.setLow(menu.getDouble("3. low"));
-          value.setClose(menu.getDouble("4. close"));
-          value.setVolume(menu.getDouble("5. volume"));
-          
-          return value;
+          return getLatestValue(timeSeriesDaily);
+
         } catch(Exception e){
         	log.error(e.getLocalizedMessage());
         }
@@ -238,6 +236,38 @@ public class StockAlertSpeechlet implements Speechlet{
           is.close();
         }
 		return null;
+    }
+    
+    private Value getLatestValue(JSONObject timeSeriesDaily){
+    	SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+        Iterator<String> keysItr = timeSeriesDaily.keys();
+        Value value = new Value();
+        Date date = null;
+        String key = null;
+        JSONObject valueJson = null;
+        TreeMap<Date, Value> stockMapPerMin = new TreeMap<Date, Value>(Collections.reverseOrder());
+        
+        while(keysItr.hasNext()) {
+            key = keysItr.next();
+            try {
+				date = formatter.parse(key);
+			} catch (ParseException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+            
+            valueJson = timeSeriesDaily.getJSONObject(key);
+            
+            value = new Value();
+            value.setOpen(valueJson.getDouble("1. open"));
+            value.setHigh(valueJson.getDouble("2. high"));
+            value.setLow(valueJson.getDouble("3. low"));
+            value.setClose(valueJson.getDouble("4. close"));
+            value.setVolume(valueJson.getDouble("5. volume"));
+            
+            stockMapPerMin.put(date, value);
+        }
+        return stockMapPerMin.firstEntry().getValue();
     }
     
     private static String readAll(Reader rd) throws IOException {
