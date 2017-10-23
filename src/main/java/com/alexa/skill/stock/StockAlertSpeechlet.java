@@ -13,15 +13,18 @@ import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.alexa.skill.stock.api.alpha.vantage.pojo.Value;
+import com.alexa.skill.stock.util.LoadProperties;
 import com.amazon.speech.slu.Intent;
 import com.amazon.speech.slu.Slot;
 import com.amazon.speech.speechlet.IntentRequest;
@@ -42,9 +45,10 @@ public class StockAlertSpeechlet implements Speechlet{
 	
 	private static final String STOCK_SLOT = "Stock";
 	
-	private static final String STOCK_KEY = "STOCKKEY";
+	//private static final String STOCK_KEY = "STOCKKEY";
 	
 	private static String url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=CTSH&apikey=W7WQEJ0I6WQ1MMJ2";
+	
 	@Override
 	public void onSessionStarted(SessionStartedRequest request, Session session) throws SpeechletException {
 		log.debug("onSessionStarted requestId={}, sessionId={}", request.getRequestId(),
@@ -68,10 +72,16 @@ public class StockAlertSpeechlet implements Speechlet{
         String intentName = (intent != null) ? intent.getName() : null;
         
         log.debug("intent "+intent+"|"+"intentName "+intentName);
-        if ("SetMyStock".equals(intentName)) {
-            return setStockInSession(intent, session);
-        } else if ("HowIsMyStockDoing".equals(intentName)) {
-            return getStockValueFromService(intent, session);
+        
+        if ("HowIsMyStockDoing".equals(intentName)) {
+            // Get the slots from the intent.
+            Map<String, Slot> slots = intent.getSlots();
+
+            // Get the stock slot from the list of slots.
+            Slot stockSlot = slots.get(STOCK_SLOT);
+            String stock = stockSlot.getValue();
+            
+            return getStockValueFromService(stock);
         } else {
             throw new SpeechletException("Invalid Intent");
         }
@@ -82,38 +92,6 @@ public class StockAlertSpeechlet implements Speechlet{
 		 log.debug("inside onSessionEnded requestId={}, sessionId={}", request.getRequestId(),
 	                session.getSessionId());	
 	}
-	
-	private SpeechletResponse setStockInSession(final Intent intent, final Session session) {
-		// Get the slots from the intent.
-        Map<String, Slot> slots = intent.getSlots();
-
-        // Get the stock slot from the list of slots.
-        Slot favoriteStockSlot = slots.get(STOCK_SLOT);
-        String speechText, repromptText;
-
-        // Check for favorite stock and create output to user.
-        if (favoriteStockSlot != null) {
-        	log.debug("favoriteStockSlot.getValue() "+ favoriteStockSlot.getValue());
-            // Store the user's favorite stock in the Session and create response.
-            String favoriteStock = favoriteStockSlot.getValue();
-            session.setAttribute(STOCK_KEY, favoriteStock);
-            speechText =
-                    String.format("I now know that your favorite stock is %s. You can ask me your "
-                            + "favorite stock by saying, how's my stock doing?", favoriteStock);
-            repromptText =
-                    "You can ask me your stock by saying, how's my stock doing?";
-
-        } else {
-        	log.debug("invalid stock name");
-            // Render an error since we don't know what the users favorite stock is.
-            speechText = "I'm not sure what your favorite stock is, please try again";
-            repromptText =
-                    "I'm not sure what your favorite stock is. You can tell me your favorite "
-                            + "stock by saying, my favorite stock is ctsh pr acn";
-        }
-
-        return getSpeechletResponse(speechText, repromptText, true);
-    }
 	
 	/**
      * Returns a Speechlet response for a speech and reprompt text.
@@ -129,6 +107,7 @@ public class StockAlertSpeechlet implements Speechlet{
         PlainTextOutputSpeech speech = new PlainTextOutputSpeech();
         speech.setText(speechText);
 
+        log.debug(speechText);
         if (isAskResponse) {
             // Create reprompt
             PlainTextOutputSpeech repromptSpeech = new PlainTextOutputSpeech();
@@ -150,7 +129,8 @@ public class StockAlertSpeechlet implements Speechlet{
      */
     private SpeechletResponse getWelcomeResponse() {
     	log.debug("inside getWelcomeResponse");
-        String speechText = "Welcome to the Alexa Skills Kit, You can set your stock by saying My favourite Stock is CTSH or ACN";
+        String speechText = "Welcome to the Alexa Skills Kit, "
+        		+ "You can say how is google stock doing or google stock";
 
         // Create the Simple card content.
         SimpleCard card = new SimpleCard();
@@ -168,37 +148,53 @@ public class StockAlertSpeechlet implements Speechlet{
         return SpeechletResponse.newAskResponse(speech, reprompt, card);
     }
 
-    private SpeechletResponse getStockValueFromService(final Intent intent, final Session session) {
-    	String speechText;
+    /**
+     * This method gets the value of stock from the api
+     * @param stockName
+     * @return
+     */
+    public SpeechletResponse getStockValueFromService(String stockName) {
+    	final StringJoiner speechText = new StringJoiner(" ");
         boolean isAskResponse = false;
+        
+        String stockCode = null;
+        
+        log.debug("stock from slot is "+ stockName);
+        List<String> stockCodeList = (new LoadProperties()).getCode(stockName);
+        log.debug("stockCodeList size"+ stockCodeList.size());
+        
+        if(stockCodeList.size()==0) {
+        	speechText.add("I'm not sure what your stock is? You can say something like, my stock is apple or google");
+            isAskResponse = true;
+        }else if(stockCodeList.size()>1) {
+        	speechText.add("I found more that one stock with this name, which one you want?");
+        	stockCodeList.forEach(stockNameFromList -> speechText.add(stockNameFromList.split(Pattern.quote("|"))[0].replaceAll("_"," ")));
+            isAskResponse = true;
+        }else { 
+        	stockCode = stockCodeList.get(0).split(Pattern.quote("|"))[1];
+	        Value value = null;
 
-        // Get the user's favorite stock from the session.
-        String favoriteStock = (String) session.getAttribute(STOCK_KEY);
-
-        Value value = null;
-        // Check to make sure user's favorite stock is set in the session.
-        if (StringUtils.isNotEmpty(favoriteStock)) {
-        	log.debug("favoriteStock from  getStockValueFromService"+ favoriteStock);
         	try {
-				value = getStockValue(favoriteStock);
+				value = getStockValue(stockCode);
 				log.debug("Value "+value);
 			} catch (MalformedURLException e) {
 				e.printStackTrace();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-            speechText = getSpeechText(value, favoriteStock);
-        } else {
-            // Since the user's favorite stock is not set render an error message.
-            speechText =
-                    "I'm not sure what your favorite stock is. You can say, my favorite stock is ctsh or acn";
-            isAskResponse = true;
-        }
+            speechText.add(getSpeechText(value, stockName));
+	    } 
 
-        return getSpeechletResponse(speechText, speechText, isAskResponse);
+        return getSpeechletResponse(speechText.toString(), speechText.toString(), isAskResponse);
     }
     
-    public String getSpeechText(Value value, String favoriteStock){
+    /**
+     * This method generates the speech text
+     * @param value
+     * @param stock
+     * @return
+     */
+    public String getSpeechText(Value value, String stock){
     	String gainLossEqual = null;
     	double percentage = 0;
     	if(value!=null){
@@ -214,11 +210,18 @@ public class StockAlertSpeechlet implements Speechlet{
     			gainLossEqual = new String("remians Equal");
     		}
     	}
-    	return String.format("Your favorite stock is %s. And today it %s from last day by %4.2f percentage "
+    	return String.format("Your stock is %s. And today it %s from last day by %4.2f percentage "
     			+ "and the amount %s is %4.2f", 
-    			favoriteStock, gainLossEqual, percentage, gainLossEqual, Math.abs(value.getOpen()-value.getClose()));
+    			stock, gainLossEqual, percentage, gainLossEqual, Math.abs(value.getOpen()-value.getClose()));
     }
     
+    /**
+     * This method call the api and get the value
+     * @param stockName
+     * @return
+     * @throws MalformedURLException
+     * @throws IOException
+     */
     public Value getStockValue(String stockName) throws MalformedURLException, IOException{
     	InputStream is = new URL(url.replace("STOCK_NAME", stockName)).openStream();
         try {
@@ -238,6 +241,11 @@ public class StockAlertSpeechlet implements Speechlet{
 		return null;
     }
     
+    /**
+     * 
+     * @param timeSeriesDaily
+     * @return
+     */
     private Value getLatestValue(JSONObject timeSeriesDaily){
     	SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
         Iterator<String> keysItr = timeSeriesDaily.keys();
@@ -270,6 +278,12 @@ public class StockAlertSpeechlet implements Speechlet{
         return stockMapPerMin.firstEntry().getValue();
     }
     
+    /**
+     * 
+     * @param rd
+     * @return
+     * @throws IOException
+     */
     private static String readAll(Reader rd) throws IOException {
         StringBuilder sb = new StringBuilder();
         int cp;
