@@ -10,6 +10,7 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -43,7 +45,8 @@ public class StockAlertSpeechlet implements Speechlet{
 
 	private static final Logger log = LoggerFactory.getLogger(StockAlertSpeechlet.class);
 	
-	private static final String STOCK_SLOT = "Stock";
+	private static final String STOCK_SLOT_1 = "StockNameOne";
+	private static final String STOCK_SLOT_2 = "StockNameTwo";
 	
 	//private static final String STOCK_KEY = "STOCKKEY";
 	
@@ -78,10 +81,13 @@ public class StockAlertSpeechlet implements Speechlet{
             Map<String, Slot> slots = intent.getSlots();
 
             // Get the stock slot from the list of slots.
-            Slot stockSlot = slots.get(STOCK_SLOT);
-            String stock = stockSlot.getValue();
+            Slot stockSlot1 = slots.get(STOCK_SLOT_1);
+            String stock1 = stockSlot1.getValue();
             
-            return getStockValueFromService(stock);
+            Slot stockSlot2 = slots.get(STOCK_SLOT_2);
+            String stock2 = stockSlot2.getValue();
+            
+            return getStockValueFromService(stock1, stock2);
         } else {
             throw new SpeechletException("Invalid Intent");
         }
@@ -153,22 +159,26 @@ public class StockAlertSpeechlet implements Speechlet{
      * @param stockName
      * @return
      */
-    public SpeechletResponse getStockValueFromService(String stockName) {
+    public SpeechletResponse getStockValueFromService(String stockName1, String stockName2) {
     	final StringJoiner speechText = new StringJoiner(" ");
         boolean isAskResponse = false;
         
         String stockCode = null;
         
-        log.debug("stock from slot is "+ stockName);
-        List<String> stockCodeList = (new LoadProperties()).getCode(stockName);
-        log.debug("stockCodeList size"+ stockCodeList.size());
+        List<String> stockCodeList = getStockCodeList(stockName1, stockName2);
         
         if(stockCodeList.size()==0) {
-        	speechText.add("I'm not sure what your stock is? You can say something like, my stock is apple or google");
+        	speechText
+        		.add("I'm not sure what your stock is? You can say something like, my stock is apple or google")
+        		.add(" and ");
             isAskResponse = true;
         }else if(stockCodeList.size()>1) {
         	speechText.add("I found more that one stock with this name, which one you want?");
-        	stockCodeList.forEach(stockNameFromList -> speechText.add(stockNameFromList.split(Pattern.quote("|"))[0].replaceAll("_"," ")));
+        	stockCodeList.forEach(stockNameFromList -> 
+        		speechText
+        				.add(stockNameFromList.split(Pattern.quote("|"))[0].replaceAll("_"," "))
+        				.add(" and "));
+        	
             isAskResponse = true;
         }else { 
         	stockCode = stockCodeList.get(0).split(Pattern.quote("|"))[1];
@@ -182,12 +192,46 @@ public class StockAlertSpeechlet implements Speechlet{
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-            speechText.add(getSpeechText(value, stockName));
+            speechText
+            	.add(getSpeechText(value, stockName1+" "+stockName2!=null?stockName2:""))
+            	.add(" and ");
 	    } 
 
-        return getSpeechletResponse(speechText.toString(), speechText.toString(), isAskResponse);
+        return getSpeechletResponse(speechText.toString().substring(0, speechText.length()-4), 
+        			speechText.toString().substring(0, speechText.length()-4), isAskResponse);
     }
     
+    /**
+     * Filters on 2 stockName
+     * @param name1
+     * @param name2
+     * @return
+     */
+    private List<String> getStockCodeList(String name1, String name2){
+    	LoadProperties loadProperties = new LoadProperties();
+    	
+    	log.debug("stock from slot is "+ name1 +" "+ (name2!=null?name2:""));
+    	if("is".equals(name1)) {
+    		name1 = name2;
+    		name2 = null;
+    	}
+    	
+        List<String> stockCodeList = loadProperties.getCode(name1);
+        log.debug("stockCodeList size"+ stockCodeList.size());
+        
+        List<String> finalResult = new ArrayList<>();
+        if(stockCodeList.size()>0 && name2!=null) {
+        	String nameTwo = name2;
+        	finalResult = stockCodeList.stream()   // convert list to stream
+                    .filter(line -> line.toLowerCase().contains(nameTwo.toLowerCase()))   // we need one that contains key
+                    .distinct()
+                    .collect(Collectors.toList());  
+        	
+        	return finalResult;
+        }else {
+        	return stockCodeList;
+        }
+    }
     /**
      * This method generates the speech text
      * @param value
