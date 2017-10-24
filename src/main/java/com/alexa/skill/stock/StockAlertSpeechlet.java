@@ -10,7 +10,6 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
@@ -19,7 +18,6 @@ import java.util.Map;
 import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -46,7 +44,7 @@ public class StockAlertSpeechlet implements Speechlet{
 	private static final Logger log = LoggerFactory.getLogger(StockAlertSpeechlet.class);
 	
 	private static final String STOCK_SLOT_1 = "StockNameOne";
-	private static final String STOCK_SLOT_2 = "StockNameTwo";
+	//private static final String STOCK_SLOT_2 = "StockNameTwo";
 	
 	//private static final String STOCK_KEY = "STOCKKEY";
 	
@@ -84,12 +82,32 @@ public class StockAlertSpeechlet implements Speechlet{
             Slot stockSlot1 = slots.get(STOCK_SLOT_1);
             String stock1 = stockSlot1.getValue();
             
-            Slot stockSlot2 = slots.get(STOCK_SLOT_2);
-            String stock2 = stockSlot2.getValue();
+           /* Slot stockSlot2 = slots.get(STOCK_SLOT_2);
+            String stock2 = stockSlot2.getValue();*/
             
-            return getStockValueFromService(stock1, stock2);
+            return getStockValueFromService(stock1/*, stock2*/);
+        } else if ("AMAZON.HelpIntent".equals(intentName)) {
+            // Create the plain text output.
+            String speechOutput =
+                    "With Skock Alert skill, you can get the latest update"
+                    + " on you stock just by saying how is apple stock doing or just say the stock name";
+
+            String repromptText = "Which stock do you want?";
+
+            return getSpeechletResponse(speechOutput, repromptText, true);
+        } else if ("AMAZON.StopIntent".equals(intentName)) {
+            PlainTextOutputSpeech outputSpeech = new PlainTextOutputSpeech();
+            outputSpeech.setText("Goodbye");
+
+            return SpeechletResponse.newTellResponse(outputSpeech);
+        } else if ("AMAZON.CancelIntent".equals(intentName)) {
+            PlainTextOutputSpeech outputSpeech = new PlainTextOutputSpeech();
+            outputSpeech.setText("Goodbye");
+
+            return SpeechletResponse.newTellResponse(outputSpeech);
         } else {
-            throw new SpeechletException("Invalid Intent");
+            String errorSpeech = "This is unsupported.  Please try something else.";
+            return getSpeechletResponse(errorSpeech, errorSpeech, true);
         }
 	}
 
@@ -159,13 +177,13 @@ public class StockAlertSpeechlet implements Speechlet{
      * @param stockName
      * @return
      */
-    public SpeechletResponse getStockValueFromService(String stockName1, String stockName2) {
+    public SpeechletResponse getStockValueFromService(String stockName1/*, String stockName2*/) {
     	final StringJoiner speechText = new StringJoiner(" ");
         boolean isAskResponse = false;
         
         String stockCode = null;
         
-        List<String> stockCodeList = getStockCodeList(stockName1, stockName2);
+        List<String> stockCodeList = getStockCodeList(stockName1/*, stockName2*/);
         
         if(stockCodeList.size()==0) {
         	speechText
@@ -193,7 +211,7 @@ public class StockAlertSpeechlet implements Speechlet{
 				e.printStackTrace();
 			}
             speechText
-            	.add(getSpeechText(value, stockName1+" "+stockName2!=null?stockName2:""))
+            	.add(getSpeechText(value, stockName1/*+" "+stockName2!=null?stockName2:""*/))
             	.add(" and ");
 	    } 
 
@@ -207,19 +225,19 @@ public class StockAlertSpeechlet implements Speechlet{
      * @param name2
      * @return
      */
-    private List<String> getStockCodeList(String name1, String name2){
+    private List<String> getStockCodeList(String name1/*, String name2*/){
     	LoadProperties loadProperties = new LoadProperties();
     	
-    	log.debug("stock from slot is "+ name1 +" "+ (name2!=null?name2:""));
+    	/*log.debug("stock from slot is "+ name1 +" "+ (name2!=null?name2:""));
     	if("is".equals(name1)) {
     		name1 = name2;
     		name2 = null;
-    	}
+    	}*/
     	
         List<String> stockCodeList = loadProperties.getCode(name1);
         log.debug("stockCodeList size"+ stockCodeList.size());
         
-        List<String> finalResult = new ArrayList<>();
+        /*List<String> finalResult = new ArrayList<>();
         if(stockCodeList.size()>0 && name2!=null) {
         	String nameTwo = name2;
         	finalResult = stockCodeList.stream()   // convert list to stream
@@ -228,9 +246,9 @@ public class StockAlertSpeechlet implements Speechlet{
                     .collect(Collectors.toList());  
         	
         	return finalResult;
-        }else {
+        }else {*/
         	return stockCodeList;
-        }
+        /*}*/
     }
     /**
      * This method generates the speech text
