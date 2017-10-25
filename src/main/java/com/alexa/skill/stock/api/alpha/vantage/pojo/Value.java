@@ -1,65 +1,77 @@
 package com.alexa.skill.stock.api.alpha.vantage.pojo;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class Value {
 
-	@JsonProperty("1. open")
-	private double open;
-	
-	@JsonProperty("2. high")
-	private double high;
-	
-	@JsonProperty("3. low")
-	private double low;
-	
-	@JsonProperty("4. close")
+	private double todaysClose;
+	private double yesterdaysClose;
+	private String stockName;
+	private String stockCode;
 	private double close;
 	
-	@JsonProperty("5. volume")
-	private double volume;
-
 	/**
-	 * @return the open
+	 * @return the todaysClose
 	 */
-	public double getOpen() {
-		return open;
+	public double getTodaysClose() {
+		return todaysClose;
 	}
 
-	/**
-	 * @param open the open to set
-	 */
-	public void setOpen(double open) {
-		this.open = open;
-	}
 
 	/**
-	 * @return the high
+	 * @param todaysClose the todaysClose to set
 	 */
-	public double getHigh() {
-		return high;
+	public void setTodaysClose(double todaysClose) {
+		this.todaysClose = todaysClose;
 	}
 
-	/**
-	 * @param high the high to set
-	 */
-	public void setHigh(double high) {
-		this.high = high;
-	}
 
 	/**
-	 * @return the low
+	 * @return the yesterdaysClose
 	 */
-	public double getLow() {
-		return low;
+	public double getYesterdaysClose() {
+		return yesterdaysClose;
 	}
 
+
 	/**
-	 * @param low the low to set
+	 * @param yesterdaysClose the yesterdaysClose to set
 	 */
-	public void setLow(double low) {
-		this.low = low;
+	public void setYesterdaysClose(double yesterdaysClose) {
+		this.yesterdaysClose = yesterdaysClose;
 	}
+
+
+	/**
+	 * @return the stockName
+	 */
+	public String getStockName() {
+		return stockName;
+	}
+
+
+	/**
+	 * @param stockName the stockName to set
+	 */
+	public void setStockName(String stockName) {
+		this.stockName = stockName;
+	}
+
+
+	/**
+	 * @return the stockCode
+	 */
+	public String getStockCode() {
+		return stockCode;
+	}
+
+
+	/**
+	 * @param stockCode the stockCode to set
+	 */
+	public void setStockCode(String stockCode) {
+		this.stockCode = stockCode;
+	}
+
 
 	/**
 	 * @return the close
@@ -68,6 +80,7 @@ public class Value {
 		return close;
 	}
 
+
 	/**
 	 * @param close the close to set
 	 */
@@ -75,26 +88,14 @@ public class Value {
 		this.close = close;
 	}
 
-	/**
-	 * @return the volume
-	 */
-	public double getVolume() {
-		return volume;
-	}
-
-	/**
-	 * @param volume the volume to set
-	 */
-	public void setVolume(double volume) {
-		this.volume = volume;
-	}
 
 	/* (non-Javadoc)
 	 * @see java.lang.Object#toString()
 	 */
 	@Override
 	public String toString() {
-		return "Value [open=" + open + ", high=" + high + ", low=" + low
-				+ ", close=" + close + ", volume=" + volume + "]";
+		return "Value [todaysClose=" + todaysClose + ", yesterdaysClose="
+				+ yesterdaysClose + ", stockName=" + stockName + ", stockCode="
+				+ stockCode + ", close=" + close + "]";
 	}
 }

@@ -1,4 +1,4 @@
-package test.StockAlertSpeechlet;
+package StockAlertSpeechlet;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -12,20 +12,20 @@ import com.alexa.skill.stock.api.alpha.vantage.pojo.Value;
 import com.alexa.skill.stock.util.LoadProperties;
 import com.amazon.speech.speechlet.SpeechletResponse;
 
-public class StockAlertSpeechletTest {
+public class StockAlertSpeechletTest{
 
-	StockAlertSpeechlet stockAlertSpeechlet = new StockAlertSpeechlet();
+	StockAlertSpeechlet stockAlertSpeechlet = new StockAlertSpeechlet();;
 	LoadProperties loadProp = new LoadProperties();
 	
 	@Test
 	public void testStockValue() throws MalformedURLException, IOException {
-		Value value = stockAlertSpeechlet.getStockValue("CTSH");
+		Value value = stockAlertSpeechlet.getStockValue("CTSH", "cognizant");
 		Assert.assertNotNull(value);
 	}
 	
 	@Test
 	public void testSpeechText() throws MalformedURLException, IOException {
-		Value value = stockAlertSpeechlet.getStockValue("CTSH");
+		Value value = stockAlertSpeechlet.getStockValue("CTSH", "cognizant");
 		Assert.assertNotNull(value);
 	}
 	
@@ -43,7 +43,7 @@ public class StockAlertSpeechletTest {
 	
 	@Test
 	public void loadStockValue() throws MalformedURLException, IOException {
-		SpeechletResponse speechletResponse = stockAlertSpeechlet.getStockValueFromService("apple"/*, null*/);
+		SpeechletResponse speechletResponse = stockAlertSpeechlet.getStockValueFromService("apple inc."/*, null*/);
 		Assert.assertTrue(speechletResponse!=null);
 	}
 	

@@ -44,11 +44,8 @@ public class StockAlertSpeechlet implements Speechlet{
 	private static final Logger log = LoggerFactory.getLogger(StockAlertSpeechlet.class);
 	
 	private static final String STOCK_SLOT_1 = "StockNameOne";
-	//private static final String STOCK_SLOT_2 = "StockNameTwo";
 	
-	//private static final String STOCK_KEY = "STOCKKEY";
-	
-	private static String url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=CTSH&apikey=W7WQEJ0I6WQ1MMJ2";
+	private static String url = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=STOCK_NAME&apikey=W7WQEJ0I6WQ1MMJ2";
 	
 	@Override
 	public void onSessionStarted(SessionStartedRequest request, Session session) throws SpeechletException {
@@ -82,10 +79,9 @@ public class StockAlertSpeechlet implements Speechlet{
             Slot stockSlot1 = slots.get(STOCK_SLOT_1);
             String stock1 = stockSlot1.getValue();
             
-           /* Slot stockSlot2 = slots.get(STOCK_SLOT_2);
-            String stock2 = stockSlot2.getValue();*/
+            log.debug("stock1 name is "+stock1);
             
-            return getStockValueFromService(stock1/*, stock2*/);
+            return getStockValueFromService(stock1);
         } else if ("AMAZON.HelpIntent".equals(intentName)) {
             // Create the plain text output.
             String speechOutput =
@@ -154,7 +150,7 @@ public class StockAlertSpeechlet implements Speechlet{
     private SpeechletResponse getWelcomeResponse() {
     	log.debug("inside getWelcomeResponse");
         String speechText = "Welcome to the Alexa Skills Kit, "
-        		+ "You can say how is google stock doing or google stock";
+        		+ "You can say how is google stock doing or just google";
 
         // Create the Simple card content.
         SimpleCard card = new SimpleCard();
@@ -177,17 +173,17 @@ public class StockAlertSpeechlet implements Speechlet{
      * @param stockName
      * @return
      */
-    public SpeechletResponse getStockValueFromService(String stockName1/*, String stockName2*/) {
+    public SpeechletResponse getStockValueFromService(String stockName) {
     	final StringJoiner speechText = new StringJoiner(" ");
         boolean isAskResponse = false;
         
         String stockCode = null;
         
-        List<String> stockCodeList = getStockCodeList(stockName1/*, stockName2*/);
+        List<String> stockCodeList = getStockCodeList(stockName);
         
         if(stockCodeList.size()==0) {
         	speechText
-        		.add("I'm not sure what your stock is? You can say something like, my stock is apple or google")
+        		.add("I'm not sure what your stock is? You can say something like, how is apple stock doing or just google")
         		.add(" and ");
             isAskResponse = true;
         }else if(stockCodeList.size()>1) {
@@ -203,7 +199,7 @@ public class StockAlertSpeechlet implements Speechlet{
 	        Value value = null;
 
         	try {
-				value = getStockValue(stockCode);
+				value = getStockValue(stockCode, stockName);
 				log.debug("Value "+value);
 			} catch (MalformedURLException e) {
 				e.printStackTrace();
@@ -211,7 +207,7 @@ public class StockAlertSpeechlet implements Speechlet{
 				e.printStackTrace();
 			}
             speechText
-            	.add(getSpeechText(value, stockName1/*+" "+stockName2!=null?stockName2:""*/))
+            	.add(getSpeechText(value, stockName))
             	.add(" and ");
 	    } 
 
@@ -228,28 +224,12 @@ public class StockAlertSpeechlet implements Speechlet{
     private List<String> getStockCodeList(String name1/*, String name2*/){
     	LoadProperties loadProperties = new LoadProperties();
     	
-    	/*log.debug("stock from slot is "+ name1 +" "+ (name2!=null?name2:""));
-    	if("is".equals(name1)) {
-    		name1 = name2;
-    		name2 = null;
-    	}*/
-    	
         List<String> stockCodeList = loadProperties.getCode(name1);
         log.debug("stockCodeList size"+ stockCodeList.size());
-        
-        /*List<String> finalResult = new ArrayList<>();
-        if(stockCodeList.size()>0 && name2!=null) {
-        	String nameTwo = name2;
-        	finalResult = stockCodeList.stream()   // convert list to stream
-                    .filter(line -> line.toLowerCase().contains(nameTwo.toLowerCase()))   // we need one that contains key
-                    .distinct()
-                    .collect(Collectors.toList());  
-        	
-        	return finalResult;
-        }else {*/
-        	return stockCodeList;
-        /*}*/
+       
+        return stockCodeList;
     }
+    
     /**
      * This method generates the speech text
      * @param value
@@ -260,21 +240,22 @@ public class StockAlertSpeechlet implements Speechlet{
     	String gainLossEqual = null;
     	double percentage = 0;
     	if(value!=null){
-    		if(value.getOpen()<value.getClose()){
+    		if(value.getYesterdaysClose()<value.getTodaysClose()){
     			gainLossEqual = new String("gained");
-    			percentage = ((value.getClose()-value.getOpen())/value.getOpen())*100;
+    			percentage = ((value.getTodaysClose()-value.getYesterdaysClose())/value.getYesterdaysClose())*100;
     		}
-    		else if(value.getOpen()>value.getClose()){
+    		else if(value.getYesterdaysClose()>value.getTodaysClose()){
     			gainLossEqual = new String("losses");
-    			percentage = ((value.getOpen()-value.getClose())/value.getOpen())*100;
+    			percentage = ((value.getYesterdaysClose()-value.getTodaysClose())/value.getTodaysClose())*100;
     		}
     		else{
     			gainLossEqual = new String("remians Equal");
     		}
     	}
     	return String.format("Your stock is %s. And today it %s from last day by %4.2f percentage "
-    			+ "and the amount %s is %4.2f dollar", 
-    			stock, gainLossEqual, percentage, gainLossEqual, Math.abs(value.getOpen()-value.getClose()));
+    			+ "and the amount %s is %4.2f dollar, its current value is %4.2f", 
+    			stock, gainLossEqual, percentage, gainLossEqual, 
+    			Math.abs(value.getTodaysClose()-value.getYesterdaysClose()), value.getTodaysClose());
     }
     
     /**
@@ -284,15 +265,15 @@ public class StockAlertSpeechlet implements Speechlet{
      * @throws MalformedURLException
      * @throws IOException
      */
-    public Value getStockValue(String stockName) throws MalformedURLException, IOException{
-    	InputStream is = new URL(url.replace("STOCK_NAME", stockName)).openStream();
+    public Value getStockValue(String stockCode, String stockName) throws MalformedURLException, IOException{
+    	InputStream is = new URL(url.replace("STOCK_NAME", stockCode)).openStream();
         try {
           BufferedReader rd = new BufferedReader(new InputStreamReader(is, Charset.forName("UTF-8")));
           String jsonText = readAll(rd);
           
           JSONObject jObject  = new JSONObject(jsonText);
           JSONObject timeSeriesDaily  = jObject.getJSONObject("Time Series (Daily)");
-          return getLatestValue(timeSeriesDaily);
+          return getLatestValue(timeSeriesDaily, stockCode, stockName);
 
         } catch(Exception e){
         	log.error(e.getLocalizedMessage());
@@ -308,14 +289,14 @@ public class StockAlertSpeechlet implements Speechlet{
      * @param timeSeriesDaily
      * @return
      */
-    private Value getLatestValue(JSONObject timeSeriesDaily){
+    private Value getLatestValue(JSONObject timeSeriesDaily, String stockCode, String stockName){
     	SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
         Iterator<String> keysItr = timeSeriesDaily.keys();
         Value value = new Value();
         Date date = null;
         String key = null;
         JSONObject valueJson = null;
-        TreeMap<Date, Value> stockMapPerMin = new TreeMap<Date, Value>(Collections.reverseOrder());
+        TreeMap<Date, Value> stockMap = new TreeMap<Date, Value>(Collections.reverseOrder());
         
         while(keysItr.hasNext()) {
             key = keysItr.next();
@@ -329,15 +310,19 @@ public class StockAlertSpeechlet implements Speechlet{
             valueJson = timeSeriesDaily.getJSONObject(key);
             
             value = new Value();
-            value.setOpen(valueJson.getDouble("1. open"));
-            value.setHigh(valueJson.getDouble("2. high"));
-            value.setLow(valueJson.getDouble("3. low"));
             value.setClose(valueJson.getDouble("4. close"));
-            value.setVolume(valueJson.getDouble("5. volume"));
+            value.setStockCode(stockCode);
+            value.setStockName(stockName);
             
-            stockMapPerMin.put(date, value);
+            stockMap.put(date, value);
         }
-        return stockMapPerMin.firstEntry().getValue();
+        
+        Value returnValue = new Value();
+        returnValue.setTodaysClose(stockMap.firstEntry().getValue().getClose());
+        stockMap.remove(stockMap.firstEntry().getKey());
+        returnValue.setYesterdaysClose(stockMap.firstEntry().getValue().getClose());
+        
+        return returnValue;
     }
     
     /**

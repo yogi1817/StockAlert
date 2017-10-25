@@ -50,7 +50,7 @@ public class LoadProperties {
 
 	public List<String> getCode(String stockName) {
 		List<String> result = propertiesFileData.stream()   // convert list to stream
-                .filter(line -> line.toLowerCase().contains(stockName.toLowerCase()))   // we need one that contains key
+                .filter(line -> line.replace("_", " ").toLowerCase().contains(stockName.toLowerCase()))   // we need one that contains key
                 .distinct()
                 .collect(Collectors.toList());              // collect the output and convert streams to a List
 
